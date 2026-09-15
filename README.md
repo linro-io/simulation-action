@@ -97,6 +97,7 @@ below.
 | `account` | | AWS account the resources deploy to. |
 | `region` | | AWS region. |
 | `project` | | GCP project. |
+| `domain` | | T Cloud Public domain: the 32-hex id or the account name. Must match your connector's spelling exactly — see below. |
 | `stack-export` | | `pulumi stack export` document, to recover the account/region a preview cannot carry. A scope hint — its resources are **not** simulated. |
 | `allow-mock-account` | `false` | Submit with no resolved account. Identities are then derived from a placeholder, so nothing matches your real inventory. Not for a gate. |
 
@@ -133,8 +134,53 @@ quietly turn off the gate you added it for.
 
 A Terraform plan carries its provider configuration, so `account` and `region`
 are often recoverable from the plan alone. A **Pulumi preview carries none** —
-if you simulate a preview, pass `account`/`region` (and `project` for GCP), or
-the resources are identified against the wrong scope.
+if you simulate a preview, pass `account`/`region` (and `project` for GCP, or
+`domain` for T Cloud Public), or the resources are identified against the wrong
+scope.
+
+The split is plan vs preview, not provider. What differs per provider is how
+many ways a *plan* can state the value:
+
+| Value | Where it can come from, in order |
+|---|---|
+| AWS region | the plan's provider config, a per-resource hint, then `region` |
+| AWS account | an `assume_role` role ARN in the provider config, `stack-export`, then `account` |
+| GCP project | a constant `project` in the `google` provider block, then `project` |
+| T Cloud Public domain | a constant `domain_id`/`domain_name` in the `opentelekomcloud` provider block, then `domain`. **That is all.** |
+
+And only a value **written in the provider block** reaches the plan. A provider
+configured from the environment — `AWS_REGION`, `OS_DOMAIN_NAME`, both commonly
+repo secrets in CI — carries nothing into `terraform show -json`. AWS has two
+other paths to fall back on; OTC has none, so an OTC plan in CI needs its input
+more often than an AWS plan needs `account`.
+
+### `domain` must match your connector, byte for byte
+
+A T Cloud Public connector's `domain` scope holds **whatever you typed when you
+created it** — the 32-hex domain id *or* the account name
+(`OTC00000000001000000000`). Linro never rewrites one form into the other, and
+every resource's identity is derived from the spelling it holds.
+
+So a simulation passing the other spelling composes rows that shadow nothing:
+every simulated resource lands *beside* its live twin instead of over it, the
+diff shows everything as new, and **nothing errors**. The run succeeds and
+describes a world that does not exist.
+
+Read the value off the connector — do not retype what you think you configured:
+
+```yaml
+      - uses: linro-io/simulation-github-action@v1
+        with:
+          plan: infra/plan.json
+          server: ${{ vars.LINRO_SERVER }}
+          token: ${{ secrets.LINRO_TOKEN }}
+          # Exactly as the connector shows it. `OS_DOMAIN_NAME` in the job's
+          # environment configures the provider; it does NOT reach the plan.
+          domain: ${{ vars.LINRO_OTC_DOMAIN }}
+```
+
+The CLI compares the value literally: it does not fold case and it does not
+resolve a name to an id, because doing either would mean calling OTC.
 
 ## Several sources, one simulation
 
