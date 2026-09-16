@@ -88,6 +88,14 @@ inputs:
   # A Terraform plan carries its provider config, so account/region are often
   # recoverable from the plan itself. A Pulumi preview carries none, so these
   # are how a preview gets scoped at all.
+  #
+  # The split is plan vs preview, not provider — but how many ways a PLAN can
+  # state a value does differ. AWS region has three (plan-wide, per-resource,
+  # the flag) and AWS account has three (an assume_role ARN, stack-export, the
+  # flag); an OTC domain has exactly one before the flag, a constant
+  # domain_id/domain_name in the provider block. Both AWS and OTC lose the
+  # provider-block value when it comes from the environment, which in CI it
+  # usually does; AWS has somewhere else to look and OTC has not.
   account:
     description: AWS account id the resources deploy to.
     required: false
@@ -98,6 +106,16 @@ inputs:
     default: ""
   project:
     description: GCP project id the resources deploy to.
+    required: false
+    default: ""
+  domain:
+    description: >-
+      T Cloud Public domain the resources deploy to: the 32-hex domain id or
+      the account name (e.g. OTC00000000001000000000). It must be spelt exactly
+      as your connector's domain scope is — the value is never rewritten from
+      one form to the other, so read it off the connector rather than retyping
+      it. An OTC provider block configured from OS_DOMAIN_NAME carries nothing
+      into the plan, which is why this is needed more often than `account` is.
     required: false
     default: ""
   stack-export:
@@ -310,6 +328,7 @@ runs:
         INPUT_ACCOUNT: ${{ inputs.account }}
         INPUT_REGION: ${{ inputs.region }}
         INPUT_PROJECT: ${{ inputs.project }}
+        INPUT_DOMAIN: ${{ inputs.domain }}
         INPUT_STACK_EXPORT: ${{ inputs.stack-export }}
         INPUT_ALLOW_MOCK_ACCOUNT: ${{ inputs.allow-mock-account }}
         INPUT_LABEL: ${{ inputs.label }}
@@ -407,6 +426,7 @@ runs:
         if [ -n "$INPUT_ACCOUNT" ];      then args+=(--account "$INPUT_ACCOUNT"); fi
         if [ -n "$INPUT_REGION" ];       then args+=(--region "$INPUT_REGION"); fi
         if [ -n "$INPUT_PROJECT" ];      then args+=(--project "$INPUT_PROJECT"); fi
+        if [ -n "$INPUT_DOMAIN" ];       then args+=(--domain "$INPUT_DOMAIN"); fi
         if [ -n "$INPUT_STACK_EXPORT" ]; then args+=(--stack-export "$INPUT_STACK_EXPORT"); fi
         if [ -n "$INPUT_PROJECT_DIR" ];  then args+=(--project-dir "$INPUT_PROJECT_DIR"); fi
         if [ -n "$INPUT_LABEL" ];        then args+=(--label "$INPUT_LABEL"); fi
