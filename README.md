@@ -132,16 +132,20 @@ quietly turn off the gate you added it for.
 
 ### Scope: what a plan knows about itself
 
-A Terraform plan carries its provider configuration, so `account` and `region`
-are often recoverable from the plan alone. A **Pulumi preview carries none** —
-if you simulate a preview, pass `account`/`region` (or `domain` for T Cloud
-Public), or the resources are identified against the wrong scope. The GCP
-project is the exception: a preview carries the stack's config, and CLI v0.6.18
-and later read it for a default provider (`gcp:project`, or
-`google-native:project` for native resources).
+Every resource is identified within a scope, and each plugin defines its own:
+which values the scope is made of (an AWS account and region, a GCP project, a
+T Cloud Public domain), and where a plan or a preview can state them. A
+plugin's page in the marketplace lists its scope under **Scopes**, for example
+[plugin-gcp](https://marketplace.linro.io/plugins/gcp).
 
-The split is plan vs preview, not provider. What differs per provider is how
-many ways a *plan* can state the value:
+The scope inputs (`account`, `region`, `project`, `domain`) supply what the
+plan or preview does not state itself. A value the scope cannot do without, and
+that nothing states, refuses the run, unless you allow a placeholder where the
+plugin offers one; a placeholder matches nothing in your inventory. How much a
+source states differs by tool as well as by provider: a Terraform plan carries
+its provider configuration, while a Pulumi preview generally carries far less.
+
+The current rules, per provider:
 
 | Value | Where it can come from, in order |
 |---|---|
@@ -234,17 +238,9 @@ checking anything more.
 
 ## GCP
 
-From CLI **v0.6.18**, GCP resources are simulated by **plugin-gcp**, the plugin
-your install inventories them with, so a simulated resource gets the same
-identity as the live one. All three dialects go through it: Terraform
-(`google` and `google-beta`), Pulumi's bridged `gcp` package, and Pulumi
+From CLI **v0.6.18**, GCP resources are simulated by **plugin-gcp**, in all three
+dialects: Terraform (`google`, `google-beta`), Pulumi `gcp` and Pulumi
 `google-native`. The action's default `version` predates this, so set it.
-
-**Availability.** As of 2026-10-08, `marketplace.linro.io` (the default
-`marketplace-url`) does not serve v0.6.18 or v0.6.19 yet: the download answers
-404 until the version is promoted to production. Until then the example below
-works only against a marketplace that serves it, and the install it simulates
-against must run Linro Release 2026.10.1 or later (see **Install version**).
 
 ```yaml
       - uses: linro-io/simulation-github-action@v1
