@@ -96,7 +96,7 @@ below.
 |---|---|---|
 | `account` | | AWS account the resources deploy to. |
 | `region` | | AWS region. |
-| `project` | | GCP project. |
+| `project` | | GCP project, for a GCP resource whose plan states none. A fallback, not an override: one that contradicts the project a provider states refuses the run. See [GCP](#gcp). |
 | `domain` | | T Cloud Public domain: the 32-hex id or the account name. Must match your connector's spelling exactly — see below. |
 | `stack-export` | | `pulumi stack export` document, to recover the account/region a preview cannot carry. A scope hint — its resources are **not** simulated. |
 | `allow-mock-account` | `false` | Submit with no resolved account. Identities are then derived from a placeholder, so nothing matches your real inventory. Not for a gate. |
@@ -132,20 +132,27 @@ quietly turn off the gate you added it for.
 
 ### Scope: what a plan knows about itself
 
-A Terraform plan carries its provider configuration, so `account` and `region`
-are often recoverable from the plan alone. A **Pulumi preview carries none** —
-if you simulate a preview, pass `account`/`region` (and `project` for GCP, or
-`domain` for T Cloud Public), or the resources are identified against the wrong
-scope.
+Every resource is identified within a scope, and each plugin defines its own:
+which values the scope is made of (an AWS account and region, a GCP project, a
+T Cloud Public domain), and where a plan or a preview can state them. A
+plugin's page in the marketplace lists its scope under **Scopes**, for example
+[plugin-gcp](https://marketplace.linro.io/plugins/gcp).
 
-The split is plan vs preview, not provider. What differs per provider is how
-many ways a *plan* can state the value:
+The scope inputs (`account`, `region`, `project`, `domain`) supply what the
+plan or preview does not state itself. A value the scope cannot do without, and
+that nothing states, refuses the run, unless you allow a placeholder where the
+plugin offers one; a placeholder matches nothing in your inventory. How much a
+source states differs by tool as well as by provider: a Terraform plan carries
+its provider configuration, while a Pulumi preview generally carries far less.
+
+The current rules, per provider:
 
 | Value | Where it can come from, in order |
 |---|---|
 | AWS region | the plan's provider config, a per-resource hint, then `region` |
 | AWS account | an `assume_role` role ARN in the provider config, `stack-export`, then `account` |
-| GCP project | a constant `project` in the `google` provider block, then `project` |
+| GCP project | the resource's own `project`, then a constant `project` in **its** provider block (a Pulumi preview: an explicit provider's `project` input; for a default provider only, the stack's `gcp:project` / `google-native:project`), then `project` |
+| GCP organization | the resource's own `org_id` / `organization` / `organizations/…` parent, then `--organization` (through `extra-args`) |
 | T Cloud Public domain | a constant `domain_id`/`domain_name` in the `opentelekomcloud` provider block, then `domain`. **That is all.** |
 
 And only a value **written in the provider block** reaches the plan. A provider
@@ -228,6 +235,47 @@ checking anything more.
           account: "123456789012"
           region: eu-central-1
 ```
+
+## GCP
+
+From CLI **v0.6.18**, GCP resources are simulated by **plugin-gcp**, in all three
+dialects: Terraform (`google`, `google-beta`), Pulumi `gcp` and Pulumi
+`google-native`. The action's default `version` predates this, so set it.
+
+```yaml
+      - uses: linro-io/simulation-github-action@v1
+        with:
+          version: v0.6.19
+          plan: plan.json
+          server: ${{ vars.LINRO_SERVER }}
+          token: ${{ secrets.LINRO_TOKEN }}
+          project: my-gcp-project            # only where the plan states none
+          extra-args: --organization 123456  # only for organization-level resources
+```
+
+- **Project.** Read per resource, from the plan first (see the scope table
+  above). `project` fills in only where nothing states one. With no project at
+  all, the run is refused by name rather than submitted with a malformed
+  identity. A resource whose own project the plan hides (a reference to
+  something not yet created, a redacted value) is **skipped** with that reason;
+  it is never guessed into another project.
+- **Organization.** An organization-level resource (an org policy, for one)
+  takes the organization it states. `--organization 123` (or
+  `organizations/123`) fills in where the parent is a folder, a project, or
+  unknown until apply. A contradiction refuses. There is no `organization`
+  input yet, so pass it through `extra-args`.
+- **Pulumi auto-naming.** A Pulumi program that leaves `name` out gets a name
+  the provider draws for the preview, and the apply draws a different one. The
+  resource is simulated under the preview's name: its findings are real, but it
+  can never match a live resource. An update keeps the live name. Set `name`
+  explicitly if you want a create to line up with what lands. A resource whose
+  name the plan cannot state at all (unknown until apply, redacted) is reported
+  as skipped, and resources that reference it are still simulated.
+- **Install version.** A resource the plan does not change is submitted with
+  fallback columns, and the CLI refuses to send them to an install older than
+  Linro Release **2026.10.1**: an older install composes those columns empty,
+  which a check would read as compliant. The refusal says so; upgrade the
+  install. This applies to every provider, not only GCP.
 
 ## Trying it without an install
 
