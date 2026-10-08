@@ -137,7 +137,8 @@ are often recoverable from the plan alone. A **Pulumi preview carries none** —
 if you simulate a preview, pass `account`/`region` (or `domain` for T Cloud
 Public), or the resources are identified against the wrong scope. The GCP
 project is the exception: a preview carries the stack's config, and CLI v0.6.18
-and later read `gcp:project` from it.
+and later read it for a default provider (`gcp:project`, or
+`google-native:project` for native resources).
 
 The split is plan vs preview, not provider. What differs per provider is how
 many ways a *plan* can state the value:
@@ -146,7 +147,7 @@ many ways a *plan* can state the value:
 |---|---|
 | AWS region | the plan's provider config, a per-resource hint, then `region` |
 | AWS account | an `assume_role` role ARN in the provider config, `stack-export`, then `account` |
-| GCP project | the resource's own `project`, then a constant `project` in **its** provider block (a Pulumi preview: an explicit provider's `project` input, else the stack's `gcp:project`), then `project` |
+| GCP project | the resource's own `project`, then a constant `project` in **its** provider block (a Pulumi preview: an explicit provider's `project` input; for a default provider only, the stack's `gcp:project` / `google-native:project`), then `project` |
 | GCP organization | the resource's own `org_id` / `organization` / `organizations/…` parent, then `--organization` (through `extra-args`) |
 | T Cloud Public domain | a constant `domain_id`/`domain_name` in the `opentelekomcloud` provider block, then `domain`. **That is all.** |
 
@@ -238,6 +239,12 @@ your install inventories them with, so a simulated resource gets the same
 identity as the live one. All three dialects go through it: Terraform
 (`google` and `google-beta`), Pulumi's bridged `gcp` package, and Pulumi
 `google-native`. The action's default `version` predates this, so set it.
+
+**Availability.** As of 2026-10-08, `marketplace.linro.io` (the default
+`marketplace-url`) does not serve v0.6.18 or v0.6.19 yet: the download answers
+404 until the version is promoted to production. Until then the example below
+works only against a marketplace that serves it, and the install it simulates
+against must run Linro Release 2026.10.1 or later (see **Install version**).
 
 ```yaml
       - uses: linro-io/simulation-github-action@v1
