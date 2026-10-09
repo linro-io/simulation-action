@@ -97,6 +97,7 @@ below.
 | `account` | | AWS account the resources deploy to. |
 | `region` | | AWS region. |
 | `project` | | GCP project, for a GCP resource whose plan states none. A fallback, not an override: one that contradicts the project a provider states refuses the run. See [GCP](#gcp). |
+| `organization` | | GCP organization (`123` or `organizations/123`), for an organization-level resource whose parent is a folder, a project, or unknown until apply. A fallback, not an override: one that contradicts the organization a resource states refuses the run. See [GCP](#gcp). |
 | `domain` | | T Cloud Public domain: the 32-hex id or the account name. Must match your connector's spelling exactly — see below. |
 | `stack-export` | | `pulumi stack export` document, to recover the account/region a preview cannot carry. A scope hint — its resources are **not** simulated. |
 | `allow-mock-account` | `false` | Submit with no resolved account. Identities are then derived from a placeholder, so nothing matches your real inventory. Not for a gate. |
@@ -138,7 +139,7 @@ T Cloud Public domain), and where a plan or a preview can state them. A
 plugin's page in the marketplace lists its scope under **Scopes**, for example
 [plugin-gcp](https://marketplace.linro.io/plugins/gcp).
 
-The scope inputs (`account`, `region`, `project`, `domain`) supply what the
+The scope inputs (`account`, `region`, `project`, `organization`, `domain`) supply what the
 plan or preview does not state itself. A value the scope cannot do without, and
 that nothing states, refuses the run, unless you allow a placeholder where the
 plugin offers one; a placeholder matches nothing in your inventory. How much a
@@ -152,7 +153,7 @@ The current rules, per provider:
 | AWS region | the plan's provider config, a per-resource hint, then `region` |
 | AWS account | an `assume_role` role ARN in the provider config, `stack-export`, then `account` |
 | GCP project | the resource's own `project`, then a constant `project` in **its** provider block (a Pulumi preview: an explicit provider's `project` input; for a default provider only, the stack's `gcp:project` / `google-native:project`), then `project` |
-| GCP organization | the resource's own `org_id` / `organization` / `organizations/…` parent, then `--organization` (through `extra-args`) |
+| GCP organization | the resource's own `org_id` / `organization` / `organizations/…` parent, then `organization` |
 | T Cloud Public domain | a constant `domain_id`/`domain_name` in the `opentelekomcloud` provider block, then `domain`. **That is all.** |
 
 And only a value **written in the provider block** reaches the plan. A provider
@@ -250,7 +251,7 @@ dialects: Terraform (`google`, `google-beta`), Pulumi `gcp` and Pulumi
           server: ${{ vars.LINRO_SERVER }}
           token: ${{ secrets.LINRO_TOKEN }}
           project: my-gcp-project            # only where the plan states none
-          extra-args: --organization 123456  # only for organization-level resources
+          organization: "123456789012"       # only for organization-level resources
 ```
 
 - **Project.** Read per resource, from the plan first (see the scope table
@@ -259,11 +260,13 @@ dialects: Terraform (`google`, `google-beta`), Pulumi `gcp` and Pulumi
   identity. A resource whose own project the plan hides (a reference to
   something not yet created, a redacted value) is **skipped** with that reason;
   it is never guessed into another project.
-- **Organization.** An organization-level resource (an org policy, for one)
-  takes the organization it states. `--organization 123` (or
-  `organizations/123`) fills in where the parent is a folder, a project, or
-  unknown until apply. A contradiction refuses. There is no `organization`
-  input yet, so pass it through `extra-args`.
+- **Organization.** An organization-level resource (a folder, a tag key, an
+  access policy, a Security Command Center config) takes the organization it
+  states (`org_id`, `organization`, an `organizations/…` parent).
+  `organization` fills in where the parent is a folder, a project, or unknown
+  until apply, as for a sub-folder of a folder the same plan creates; without
+  it such a resource is **skipped** with that reason. A contradiction refuses.
+  Organization-level resources are simulated from CLI **v0.6.27**.
 - **Pulumi auto-naming.** A Pulumi program that leaves `name` out gets a name
   the provider draws for the preview, and the apply draws a different one. The
   resource is simulated under the preview's name: its findings are real, but it
