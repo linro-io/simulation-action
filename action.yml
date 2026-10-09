@@ -108,6 +108,14 @@ inputs:
     description: GCP project id the resources deploy to.
     required: false
     default: ""
+  organization:
+    description: >-
+      GCP organization id (123 or organizations/123), for an
+      organization-level resource whose parent is a folder, a project, or
+      unknown until apply. A fallback, not an override: a resource that states
+      its organization wins, and a contradiction refuses the run.
+    required: false
+    default: ""
   domain:
     description: >-
       T Cloud Public domain the resources deploy to: the 32-hex domain id or
@@ -328,6 +336,7 @@ runs:
         INPUT_ACCOUNT: ${{ inputs.account }}
         INPUT_REGION: ${{ inputs.region }}
         INPUT_PROJECT: ${{ inputs.project }}
+        INPUT_ORGANIZATION: ${{ inputs.organization }}
         INPUT_DOMAIN: ${{ inputs.domain }}
         INPUT_STACK_EXPORT: ${{ inputs.stack-export }}
         INPUT_ALLOW_MOCK_ACCOUNT: ${{ inputs.allow-mock-account }}
@@ -426,6 +435,7 @@ runs:
         if [ -n "$INPUT_ACCOUNT" ];      then args+=(--account "$INPUT_ACCOUNT"); fi
         if [ -n "$INPUT_REGION" ];       then args+=(--region "$INPUT_REGION"); fi
         if [ -n "$INPUT_PROJECT" ];      then args+=(--project "$INPUT_PROJECT"); fi
+        if [ -n "$INPUT_ORGANIZATION" ]; then args+=(--organization "$INPUT_ORGANIZATION"); fi
         if [ -n "$INPUT_DOMAIN" ];       then args+=(--domain "$INPUT_DOMAIN"); fi
         if [ -n "$INPUT_STACK_EXPORT" ]; then args+=(--stack-export "$INPUT_STACK_EXPORT"); fi
         if [ -n "$INPUT_PROJECT_DIR" ];  then args+=(--project-dir "$INPUT_PROJECT_DIR"); fi
