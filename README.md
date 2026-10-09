@@ -246,7 +246,7 @@ dialects: Terraform (`google`, `google-beta`), Pulumi `gcp` and Pulumi
 ```yaml
       - uses: linro-io/simulation-github-action@v1
         with:
-          version: v0.6.19
+          version: v0.6.27
           plan: plan.json
           server: ${{ vars.LINRO_SERVER }}
           token: ${{ secrets.LINRO_TOKEN }}
